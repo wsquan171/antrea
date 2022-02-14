@@ -414,6 +414,9 @@ function deliver_antrea {
     echo "---" >> $GIT_CHECKOUT_DIR/build/yamls/$antrea_yml
     cat $GIT_CHECKOUT_DIR/build/yamls/antrea-prometheus.yml >> $GIT_CHECKOUT_DIR/build/yamls/$antrea_yml
 
+    # Generate flow-visibility related files
+    $GIT_CHECKOUT_DIR/hack/generate-manifest-flow-visibility.sh --mode e2e > $GIT_CHECKOUT_DIR/build/yamls/flow-visibility.yml
+
     echo "====== Delivering Antrea to all the Nodes ======"
     export KUBECONFIG=${GIT_CHECKOUT_DIR}/jenkins/out/kubeconfig
 
@@ -439,6 +442,32 @@ function deliver_antrea {
             copy_image antrea-ubuntu.tar projects.registry.vmware.com/antrea/antrea-ubuntu ${IPs[$i]} ${DOCKER_IMG_VERSION} true
             copy_image flow-aggregator.tar projects.registry.vmware.com/antrea/flow-aggregator ${IPs[$i]} ${DOCKER_IMG_VERSION} true
         fi
+    done
+
+    echo "====== Pulling Flow Visibility images ======"
+    FV_IMAGES=($(cat $GIT_CHECKOUT_DIR/build/yamls/flow-visibility.yml | grep image: | awk '{print $(NF)}' | xargs))
+    for image in "${FV_IMAGES[@]}"; do
+        for i in `seq 3`; do
+            docker pull $image && break
+            sleep 1
+        done
+    done
+
+    echo "====== Delivering Flow Visibility images to all the Nodes ======"
+    node_num=$(kubectl get nodes --no-headers=true | wc -l)
+    old_IFS=$IFS
+    for image in "${FV_IMAGES[@]}"; do
+        IFS=:
+        read repo tag <<< "$image"
+        IFS=$old_IFS
+        echo "Saving" $repo:$tag
+        docker save -o flow-visibility.tar $repo:$tag
+        for i in "${!IPs[@]}"
+        do
+            if [[ $i -ge $((${node_num}/2)) ]]; then
+                copy_image flow-visibility.tar $repo ${IPs[$i]} $tag false
+            fi
+        done
     done
 
     if [[ -z $OLD_ANTREA_VERSION ]]; then

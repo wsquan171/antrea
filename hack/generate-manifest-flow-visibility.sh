@@ -20,11 +20,15 @@ function echoerr {
     >&2 echo "$@"
 }
 
-_usage="Usage: $0 [--mode (dev|release)] [--keep] [--help|-h]
+_usage="Usage: $0 [--mode (dev|release|e2e)] [--keep] [--help|-h]
 Generate a YAML manifest for the Clickhouse-Grafana Flow-visibility Solution, using Kustomize, and
 print it to stdout.
-        --mode (dev|release)  Choose the configuration variant that you need (default is 'dev')
-        --keep                Debug flag which will preserve the generated kustomization.yml
+        --mode (dev|release|e2e)  Choose the configuration variant that you need (default is 'dev')
+                                  e2e mode generates YAML manifest for e2e test, which includes
+                                  clickhouse operator and server with default credentials,
+                                  but not Grafana-related functionality
+        --keep                    Debug flag which will preserve the generated kustomization.yml
+        --help, -h                Print this message and exit
 
 This tool uses kustomize (https://github.com/kubernetes-sigs/kustomize) to generate manifests for
 Clickhouse-Grafana Flow-visibility Solution. You can set the KUSTOMIZE environment variable to the
@@ -66,7 +70,7 @@ case $key in
 esac
 done
 
-if [ "$MODE" != "dev" ] && [ "$MODE" != "release" ]; then
+if [ "$MODE" != "dev" ] && [ "$MODE" != "release" ] && [ "$MODE" != "e2e" ]; then
     echoerr "--mode must be one of 'dev' or 'release'"
     print_help
     exit 1
@@ -106,9 +110,30 @@ BASE=../../base
 
 mkdir $MODE && cd $MODE
 touch kustomization.yml
-$KUSTOMIZE edit add base $BASE
 # ../../patches/$MODE may be empty so we use find and not simply cp
 find ../../patches/$MODE -name \*.yml -exec cp {} . \;
+
+if [ "$MODE" == "e2e" ]; then
+    mkdir -p base/provisioning/datasources
+    cp $KUSTOMIZATION_DIR/base/clickhouse.yml base/clickhouse.yml
+    # Substitute clickhouse image to pull from distribution harbor
+    # Due to limitation of kustomize CRD patches replying on openapi defs, using sed here
+    sed -i -e 's/image: yandex/image: projects.registry.vmware.com\/antrea/g' base/clickhouse.yml
+    cp $KUSTOMIZATION_DIR/base/kustomization-e2e.yml base/kustomization.yml
+    cp $KUSTOMIZATION_DIR/base/kustomize-config.yml base/kustomize-config.yml
+    cp $KUSTOMIZATION_DIR/base/provisioning/datasources/create_table.sh base/provisioning/datasources/create_table.sh
+
+    ch_operator_url="https://raw.githubusercontent.com/Altinity/clickhouse-operator/0.18.2/deploy/operator/clickhouse-operator-install-bundle.yaml"
+    curl -sLo clickhouse-operator-install-bundle.yml "${ch_operator_url}"
+    $KUSTOMIZE edit add base base
+    $KUSTOMIZE edit add base clickhouse-operator-install-bundle.yml
+    $KUSTOMIZE edit add patch --path imagePullPolicyOperator.yml
+
+    $KUSTOMIZE edit set image flow-visibility-clickhouse-monitor=projects.registry.vmware.com/antrea/flow-visibility-clickhouse-monitor:latest
+    $KUSTOMIZE edit add patch --path imagePullPolicyMonitor.yml
+else
+    $KUSTOMIZE edit add base $BASE
+fi
 
 if [ "$MODE" == "dev" ]; then
     $KUSTOMIZE edit set image flow-visibility-clickhouse-monitor=projects.registry.vmware.com/antrea/flow-visibility-clickhouse-monitor:latest
@@ -122,7 +147,6 @@ fi
 $KUSTOMIZE build
 
 popd > /dev/null
-
 
 if $KEEP; then
     echoerr "Kustomization file is at $TMP_DIR/$MODE/kustomization.yml"
