@@ -15,7 +15,7 @@ require (
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/cheggaaa/pb/v3 v3.0.8
 	github.com/confluentinc/bincover v0.1.0
-	github.com/containernetworking/cni v0.8.1
+	github.com/containernetworking/cni v1.1.0
 	github.com/containernetworking/plugins v0.8.7
 	github.com/coreos/go-iptables v0.6.0
 	github.com/gammazero/deque v0.1.0
@@ -37,7 +37,7 @@ require (
 	github.com/miekg/dns v1.1.43
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
 	github.com/onsi/ginkgo v1.16.4
-	github.com/onsi/gomega v1.13.0
+	github.com/onsi/gomega v1.17.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.11.0
 	github.com/prometheus/common v0.26.0
