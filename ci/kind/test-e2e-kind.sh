@@ -49,7 +49,7 @@ function quit {
     $TESTBED_CMD destroy kind
   fi
 }
-trap "quit" INT EXIT
+#trap "quit" INT EXIT
 
 mode=""
 ipfamily="v4"
@@ -126,7 +126,7 @@ if ! $np; then
 fi
 
 COMMON_IMAGES_LIST=("k8s.gcr.io/e2e-test-images/agnhost:2.29" \
-                    "projects.registry.vmware.com/library/busybox"  \
+                    "projects.registry.vmware.com/antrea/busybox"  \
                     "projects.registry.vmware.com/antrea/nginx:1.21.6-alpine" \
                     "projects.registry.vmware.com/antrea/perftool" \
                     "projects.registry.vmware.com/antrea/ipfix-collector:v0.5.12")

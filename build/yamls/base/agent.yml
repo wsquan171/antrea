@@ -96,6 +96,9 @@ spec:
             - containerPort: 10350
               name: api
               protocol: TCP
+            - containerPort: 6060
+              name: pprof
+              protocol: TCP
           livenessProbe:
             exec:
               command:

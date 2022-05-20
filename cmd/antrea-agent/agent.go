@@ -17,6 +17,8 @@ package main
 import (
 	"fmt"
 	"net"
+	"net/http"
+	_ "net/http/pprof"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -83,6 +85,10 @@ var excludeNodePortDevices = []string{"antrea-egress0", "antrea-ingress0", "kube
 // run starts Antrea agent with the given options and waits for termination signal.
 func run(o *Options) error {
 	klog.Infof("Starting Antrea agent (version %s)", version.GetFullVersion())
+
+	go func() {
+		klog.Info(http.ListenAndServe("localhost:6060", nil))
+	}()
 
 	// Windows platform doesn't support Egress feature yet.
 	egressEnabled := features.DefaultFeatureGate.Enabled(features.Egress) && !runtime.IsWindowsPlatform()
