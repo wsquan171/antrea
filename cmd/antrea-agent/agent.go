@@ -19,6 +19,8 @@ import (
 	"net"
 	"net/http"
 	_ "net/http/pprof"
+	"os"
+	"runtime/pprof"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -88,6 +90,28 @@ func run(o *Options) error {
 
 	go func() {
 		klog.Info(http.ListenAndServe("localhost:6060", nil))
+	}()
+
+	done := make(chan bool)
+	go func() {
+		ticker := time.NewTicker(10 * time.Minute)
+		for {
+			select {
+			case <-done:
+				return
+			case <-ticker.C:
+				f, err := os.Create("/pprof/profile.pb.gz")
+				if err != nil {
+					klog.Errorf("Failed to create /pprof/profile.pb.gz: %v", err)
+					continue
+				}
+				if err = pprof.WriteHeapProfile(f); err != nil {
+					klog.Errorf("Failed to write heap profile: %v", err)
+					continue
+				}
+				_ = f.Close()
+			}
+		}
 	}()
 
 	// Windows platform doesn't support Egress feature yet.
@@ -648,6 +672,7 @@ func run(o *Options) error {
 	}
 
 	<-stopCh
+	done <- true
 	klog.Info("Stopping Antrea agent")
 	return nil
 }
