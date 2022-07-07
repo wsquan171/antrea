@@ -158,6 +158,7 @@ func (cs *connectionStore) UpdateConnAndQueue(pqItem *flowexporter.ItemToExpire,
 	conn.LastExportTime = currTime
 	if conn.ReadyToDelete || !conn.IsActive {
 		cs.expirePriorityQueue.RemoveItemFromMap(conn)
+		klog.Infof("pq %s deleted", flowexporter.NewConnectionKey(conn))
 	} else {
 		// For active connections, we update their "prev" stats fields,
 		// reset active expire time and push back into the PQ.

@@ -96,6 +96,8 @@ func (cs *ConntrackConnectionStore) Run(stopCh <-chan struct{}) {
 // TODO: As optimization, only poll invalid/closed connections during every poll, and poll the established connections right before the export.
 func (cs *ConntrackConnectionStore) Poll() ([]int, error) {
 	klog.V(2).Infof("Polling conntrack")
+	klog.Infof("conn map size %d, pq map size %d, pq queue size %d", len(cs.connections),
+		len(cs.expirePriorityQueue.KeyToItem), cs.expirePriorityQueue.Len())
 	// Reset IsPresent flag for all connections in connection map before dumping
 	// flows in conntrack module. If the connection does not exist in conntrack
 	// table and has been exported, then we will delete it from connection map.
@@ -105,7 +107,13 @@ func (cs *ConntrackConnectionStore) Poll() ([]int, error) {
 		if !conn.IsPresent {
 			// Delete the connection if it is ready to delete or it was not exported
 			// in the time period as specified by the stale connection timeout.
-			if conn.ReadyToDelete || time.Since(conn.LastExportTime) >= cs.staleConnectionTimeout {
+			t := time.Since(conn.LastExportTime)
+			if conn.ReadyToDelete || t >= cs.staleConnectionTimeout {
+				if conn.ReadyToDelete {
+					klog.Infof("conn %s deleted due to marked as ReadyToDelete", key)
+				} else {
+					klog.Infof("conn %s deleted due to timeout %v", key, t)
+				}
 				if err := cs.deleteConnWithoutLock(key); err != nil {
 					return err
 				}
